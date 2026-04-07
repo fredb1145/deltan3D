@@ -1,4 +1,3 @@
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
@@ -17,9 +16,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { preparePanorama, uploadPanorama } from '../lib/panoramaUpload';
+import { getPanoramaValidationMessage } from '../lib/panoramaValidation';
 import { supabase } from '../lib/supabase';
-
-const STORAGE_BUCKET = 'tour-panoramas';
 
 type DraftScene = {
   id: string;
@@ -52,11 +51,6 @@ function getDefaultSceneLabel(index: number) {
 function normalizeSceneLabel(label: string, index: number) {
   const trimmed = label.trim();
   return trimmed.length ? trimmed : getDefaultSceneLabel(index);
-}
-
-function isApproximate360(width: number, height: number) {
-  const ratio = width / height;
-  return ratio >= 1.9 && ratio <= 2.1;
 }
 
 function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
@@ -130,23 +124,26 @@ export default function CreateTourScreen() {
       const width = asset.width || 0;
       const height = asset.height || 0;
 
-      if (!width || !height || !isApproximate360(width, height)) {
+      const validationMessage = getPanoramaValidationMessage(width, height);
+
+      if (validationMessage) {
         skippedCount += 1;
         continue;
       }
 
-      const normalized = await ImageManipulator.manipulateAsync(asset.uri, [], {
-        compress: 0.92,
-        format: ImageManipulator.SaveFormat.JPEG,
-      });
+      try {
+        const normalized = await preparePanorama(asset.uri);
 
-      validScenes.push({
-        id: createSceneId(),
-        label: '',
-        localUri: normalized.uri,
-        imageWidth: normalized.width,
-        imageHeight: normalized.height,
-      });
+        validScenes.push({
+          id: createSceneId(),
+          label: '',
+          localUri: normalized.uri,
+          imageWidth: normalized.width,
+          imageHeight: normalized.height,
+        });
+      } catch (error) {
+        skippedCount += 1;
+      }
     }
 
     if (!validScenes.length) {
@@ -244,18 +241,21 @@ export default function CreateTourScreen() {
     const width = asset.width || 0;
     const height = asset.height || 0;
 
-    if (!width || !height || !isApproximate360(width, height)) {
-      Alert.alert(
-        'Invalid 360 photo',
-        'Please choose a true 360 photo with an approximate 2:1 width-to-height shape.',
-      );
+    const validationMessage = getPanoramaValidationMessage(width, height);
+
+    if (validationMessage) {
+      Alert.alert('Invalid 360 photo', validationMessage);
       return;
     }
 
-    const normalized = await ImageManipulator.manipulateAsync(asset.uri, [], {
-      compress: 0.92,
-      format: ImageManipulator.SaveFormat.JPEG,
-    });
+    let normalized: { uri: string; width: number; height: number };
+
+    try {
+      normalized = await preparePanorama(asset.uri);
+    } catch (error: any) {
+      Alert.alert('Invalid 360 photo', error?.message || 'Please choose a true 360 photo.');
+      return;
+    }
 
     setScenes(prev =>
       prev.map(scene =>
@@ -271,37 +271,18 @@ export default function CreateTourScreen() {
     );
   };
 
-  const uploadSceneImage = async (tourId: string, scene: DraftScene) => {
-    const filePath = `${tourId}/${scene.id}.jpg`;
-
-    const response = await fetch(scene.localUri);
-    const bytes = await response.arrayBuffer();
-
-    if (!bytes || bytes.byteLength === 0) {
-      throw new Error(`Could not prepare ${scene.label} for upload.`);
-    }
-
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(filePath, bytes, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: 'image/jpeg',
-      });
-
-    if (uploadError) {
-      throw new Error(uploadError.message);
-    }
-
-    const { data: signedData, error: signedError } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .createSignedUrl(filePath, 60 * 60);
-
-    if (signedError || !signedData?.signedUrl) {
-      throw new Error(`Saved ${scene.label}, but it could not be prepared for viewing.`);
-    }
-
-    return filePath;
+  const uploadSceneImage = async (params: {
+    userId: string;
+    tourId: string;
+    scene: DraftScene;
+  }) => {
+    const { userId, tourId, scene } = params;
+    return uploadPanorama({
+      userId,
+      tourId,
+      sceneId: scene.id,
+      localUri: scene.localUri,
+    });
   };
 
   const handleCreateTour = async () => {
@@ -357,14 +338,18 @@ export default function CreateTourScreen() {
 
       for (let index = 0; index < scenes.length; index += 1) {
         const scene = scenes[index];
-        const imagePath = await uploadSceneImage(insertedTour.id, scene);
+        const uploaded = await uploadSceneImage({
+          userId: userData.user.id,
+          tourId: insertedTour.id,
+          scene,
+        });
 
         uploadedScenes.push({
           id: scene.id,
           label: normalizeSceneLabel(scene.label, index),
-          imagePath,
-          imageWidth: scene.imageWidth,
-          imageHeight: scene.imageHeight,
+          imagePath: uploaded.path,
+          imageWidth: uploaded.width,
+          imageHeight: uploaded.height,
         });
       }
 

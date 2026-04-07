@@ -1,6 +1,6 @@
-import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber/native';
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { BackSide, SRGBColorSpace, TextureLoader } from 'three';
 import { getPanoramaValidationMessage } from '../lib/panoramaValidation';
 
@@ -104,7 +104,9 @@ function PanoramaScene({
 export default function PanoramaViewer({ imageUrl, onError }: Props) {
   const [ready, setReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
+  const lastPoint = useRef({ x: 0, y: 0 });
   const controls = useRef<ControlState>({
     yaw: 0,
     pitch: 0,
@@ -126,26 +128,6 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
     onError?.(message);
   };
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          controls.current.yaw = controls.current.targetYaw;
-          controls.current.pitch = controls.current.targetPitch;
-        },
-        onPanResponderMove: (_, gesture) => {
-          const sensitivity = 0.005;
-          controls.current.targetYaw = controls.current.yaw - gesture.dx * sensitivity;
-          controls.current.targetPitch = clampPitch(
-            controls.current.pitch - gesture.dy * sensitivity,
-          );
-        },
-      }),
-    [],
-  );
-
   if (!imageUrl) {
     return (
       <View style={styles.center}>
@@ -163,7 +145,26 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
   }
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View
+      style={styles.container}
+      onPointerDown={(event: any) => {
+        setDragging(true);
+        lastPoint.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMove={(event: any) => {
+        if (!dragging) return;
+
+        const dx = event.clientX - lastPoint.current.x;
+        const dy = event.clientY - lastPoint.current.y;
+        lastPoint.current = { x: event.clientX, y: event.clientY };
+
+        const sensitivity = 0.005;
+        controls.current.targetYaw -= dx * sensitivity;
+        controls.current.targetPitch = clampPitch(controls.current.targetPitch - dy * sensitivity);
+      }}
+      onPointerUp={() => setDragging(false)}
+      onPointerLeave={() => setDragging(false)}
+    >
       <PanoramaErrorBoundary onError={handleError}>
         <Canvas style={styles.canvas}>
           <Suspense fallback={null}>
@@ -190,6 +191,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0D0407',
+    touchAction: 'none',
   },
   canvas: {
     flex: 1,

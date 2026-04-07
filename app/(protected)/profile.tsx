@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AdminAccess, resolveAdminAccess } from '../../lib/adminAccess';
 import { supabase } from '../../lib/supabase';
 
 export default function ProfileScreen() {
@@ -9,7 +10,7 @@ export default function ProfileScreen() {
 
   const [fullName, setFullName] = useState('User');
   const [email, setEmail] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminAccess, setAdminAccess] = useState<AdminAccess | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function ProfileScreen() {
 
       if (profile) {
         setFullName(profile.full_name || 'User');
-        setIsAdmin(profile.is_admin === true);
+        setAdminAccess(resolveAdminAccess(profile));
       }
     } catch (error: any) {
       Alert.alert('Error', error.message);
@@ -116,7 +117,7 @@ export default function ProfileScreen() {
             {loading ? 'Please wait...' : email}
           </Text>
 
-          {isAdmin && (
+          {adminAccess?.isAdmin && (
             <>
               <View
                 style={{

@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 import PanoramaViewer from '../../components/PanoramaViewer';
+import { createSignedPanoramaUrl } from '../../lib/panoramaUpload';
+import { getPanoramaValidationMessage } from '../../lib/panoramaValidation';
 import { supabase } from '../../lib/supabase';
 
 type NodeType = {
@@ -74,7 +76,10 @@ export default function TourViewer() {
     }
 
     const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
-    const tourNodes = rawNodes.filter(isValidNode);
+    const tourNodes = rawNodes.filter(isValidNode).filter(node => {
+      if (!node.imageWidth || !node.imageHeight) return true;
+      return !getPanoramaValidationMessage(node.imageWidth, node.imageHeight);
+    });
 
     if (!tourNodes.length) {
       setInitialLoading(false);
@@ -114,12 +119,9 @@ export default function TourViewer() {
     const normalizedPath = path.trim();
 
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      const { data, error } = await supabase.storage
-        .from('tour-panoramas')
-        .createSignedUrl(normalizedPath, 60 * 60);
-
-      if (!error && data?.signedUrl) {
-        const nextUrl = `${data.signedUrl}${data.signedUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+      try {
+        const signedUrl = await createSignedPanoramaUrl(normalizedPath);
+        const nextUrl = `${signedUrl}${signedUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
         setImageUrl(nextUrl);
 
         if (isInitial) {
@@ -129,10 +131,10 @@ export default function TourViewer() {
         }
 
         return true;
-      }
-
-      if (attempt < 3) {
-        await delay(700);
+      } catch (error) {
+        if (attempt < 3) {
+          await delay(700);
+        }
       }
     }
 
@@ -195,7 +197,11 @@ export default function TourViewer() {
 
   return (
     <View style={styles.container}>
-      <PanoramaViewer key={imageUrl} imageUrl={imageUrl} />
+      <PanoramaViewer
+        key={imageUrl}
+        imageUrl={imageUrl}
+        onError={(message) => setErrorMessage(message)}
+      />
 
       {sceneLoading ? (
         <View style={styles.loadingOverlay}>

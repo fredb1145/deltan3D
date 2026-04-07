@@ -1,10 +1,9 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import { getPanoramaValidationMessage } from './panoramaValidation';
 import { supabase } from './supabase';
 
 const PANORAMA_BUCKET = 'tour-panoramas';
 const MAX_WIDTH = 4096;
-const MIN_WIDTH = 1500;
-const MIN_HEIGHT = 750;
 
 export type UploadedPanorama = {
   path: string;
@@ -13,18 +12,9 @@ export type UploadedPanorama = {
 };
 
 function validatePanorama(width: number, height: number) {
-  if (!width || !height) {
-    throw new Error('This 360 photo could not be processed.');
-  }
-
-  if (width < MIN_WIDTH || height < MIN_HEIGHT) {
-    throw new Error('This 360 photo is too small.');
-  }
-
-  const ratio = width / height;
-
-  if (ratio < 1.85 || ratio > 2.15) {
-    throw new Error('Please upload a proper 360 photo.');
+  const message = getPanoramaValidationMessage(width, height);
+  if (message) {
+    throw new Error(message);
   }
 }
 

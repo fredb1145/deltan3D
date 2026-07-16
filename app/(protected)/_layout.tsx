@@ -1,8 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { View } from 'react-native';
+import { Slot, Tabs, usePathname } from 'expo-router';
+import { Platform, View } from 'react-native';
+import WebDesktopShell from '../../components/WebDesktopShell';
 
 export default function ProtectedTabsLayout() {
+  const pathname = usePathname();
+
+  if (Platform.OS === 'web') {
+    if (pathname === '/') {
+      return <Slot />;
+    }
+
+    return <WebDesktopShell />;
+  }
+
   return (
     <Tabs
       screenOptions={({ route }) => ({

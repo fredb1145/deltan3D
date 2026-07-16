@@ -1,12 +1,17 @@
 import * as ImageManipulator from 'expo-image-manipulator';
+import { Image } from 'react-native';
 import { getPanoramaValidationMessage } from './panoramaValidation';
 import { supabase } from './supabase';
 
 const PANORAMA_BUCKET = 'tour-panoramas';
-const MAX_WIDTH = 4096;
+const MAX_WIDTH = 2048;
+const JPEG_QUALITY = 0.72;
+const PREVIEW_WIDTH = 640;
+const PREVIEW_QUALITY = 0.48;
 
 export type UploadedPanorama = {
   path: string;
+  previewPath: string;
   width: number;
   height: number;
 };
@@ -32,34 +37,47 @@ function buildStoragePath(userId: string, tourId: string, sceneId: string) {
   return `${userId}/${tourId}/${sceneId}/panorama-${Date.now()}.jpg`;
 }
 
+async function getLocalImageSize(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      reject,
+    );
+  });
+}
+
+async function manipulatePanoramaVariant(
+  localUri: string,
+  maxWidth: number,
+  quality: number,
+): Promise<{
+  uri: string;
+  width: number;
+  height: number;
+}> {
+  const sourceSize = await getLocalImageSize(localUri);
+  const actions = sourceSize.width > maxWidth ? [{ resize: { width: maxWidth } }] : [];
+
+  const result = await ImageManipulator.manipulateAsync(localUri, actions, {
+    compress: quality,
+    format: ImageManipulator.SaveFormat.JPEG,
+    base64: false,
+  });
+
+  return {
+    uri: result.uri,
+    width: result.width,
+    height: result.height,
+  };
+}
+
 export async function preparePanorama(localUri: string): Promise<{
   uri: string;
   width: number;
   height: number;
 }> {
-  const initial = await ImageManipulator.manipulateAsync(
-    localUri,
-    [],
-    {
-      compress: 0.9,
-      format: ImageManipulator.SaveFormat.JPEG,
-      base64: false,
-    }
-  );
-
-  let finalResult = initial;
-
-  if (initial.width > MAX_WIDTH) {
-    finalResult = await ImageManipulator.manipulateAsync(
-      initial.uri,
-      [{ resize: { width: MAX_WIDTH } }],
-      {
-        compress: 0.9,
-        format: ImageManipulator.SaveFormat.JPEG,
-        base64: false,
-      }
-    );
-  }
+  const finalResult = await manipulatePanoramaVariant(localUri, MAX_WIDTH, JPEG_QUALITY);
 
   validatePanorama(finalResult.width, finalResult.height);
 
@@ -70,36 +88,82 @@ export async function preparePanorama(localUri: string): Promise<{
   };
 }
 
+async function preparePanoramaPreview(localUri: string): Promise<{
+  uri: string;
+  width: number;
+  height: number;
+}> {
+  return manipulatePanoramaVariant(localUri, PREVIEW_WIDTH, PREVIEW_QUALITY);
+}
+
+function buildPreviewStoragePath(userId: string, tourId: string, sceneId: string, stamp: number) {
+  return `${userId}/${tourId}/${sceneId}/preview-${stamp}.jpg`;
+}
+
 export async function uploadPanorama(params: {
   userId: string;
   tourId: string;
   sceneId: string;
   localUri: string;
+  alreadyPrepared?: boolean;
+  imageWidth?: number;
+  imageHeight?: number;
 }): Promise<UploadedPanorama> {
-  const { userId, tourId, sceneId, localUri } = params;
+  const { userId, tourId, sceneId, localUri, alreadyPrepared, imageWidth, imageHeight } = params;
 
   if (!userId || !tourId || !sceneId || !localUri) {
     throw new Error('Missing upload details.');
   }
 
-  const prepared = await preparePanorama(localUri);
-  const bytes = await fileUriToArrayBuffer(prepared.uri);
-  const path = buildStoragePath(userId, tourId, sceneId);
+  const prepared =
+    alreadyPrepared && imageWidth && imageHeight
+      ? (() => {
+          validatePanorama(imageWidth, imageHeight);
 
-  const { error } = await supabase.storage
-    .from(PANORAMA_BUCKET)
-    .upload(path, bytes, {
+          return {
+            uri: localUri,
+            width: imageWidth,
+            height: imageHeight,
+          };
+        })()
+      : await preparePanorama(localUri);
+
+  const preview = await preparePanoramaPreview(prepared.uri);
+  const [bytes, previewBytes] = await Promise.all([
+    fileUriToArrayBuffer(prepared.uri),
+    fileUriToArrayBuffer(preview.uri),
+  ]);
+
+  const stamp = Date.now();
+  const path = buildStoragePath(userId, tourId, sceneId);
+  const previewPath = buildPreviewStoragePath(userId, tourId, sceneId, stamp);
+
+  const [fullUpload, previewUpload] = await Promise.all([
+    supabase.storage.from(PANORAMA_BUCKET).upload(path, bytes, {
       contentType: 'image/jpeg',
       cacheControl: '31536000',
       upsert: false,
-    });
+    }),
+    supabase.storage.from(PANORAMA_BUCKET).upload(previewPath, previewBytes, {
+      contentType: 'image/jpeg',
+      cacheControl: '31536000',
+      upsert: false,
+    }),
+  ]);
 
-  if (error) {
-    throw new Error(error.message || 'Could not upload this 360 photo.');
+  if (fullUpload.error || previewUpload.error) {
+    await supabase.storage.from(PANORAMA_BUCKET).remove([path, previewPath]);
+
+    throw new Error(
+      fullUpload.error?.message ||
+        previewUpload.error?.message ||
+        'Could not upload this 360 photo.',
+    );
   }
 
   return {
     path,
+    previewPath,
     width: prepared.width,
     height: prepared.height,
   };

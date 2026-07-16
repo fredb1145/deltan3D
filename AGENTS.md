@@ -699,3 +699,291 @@ Every decision must protect:
 - role-based access safety
 - subscription plan flexibility
 - full-app integrity
+
+---
+
+# Deltan3D Motion & Interaction Enhancement (Cross-Platform - No Redesign)
+
+You are working on an existing production codebase for Deltan3D.
+
+This is **NOT** a redesign project.
+
+The application's layouts, navigation, branding, color palette, features, workflows, and business logic have already been established and must remain intact.
+
+Your task is to elevate the application's interaction quality to a world-class level while preserving the existing design.
+
+## Non-Negotiable Rules
+
+* Do NOT redesign screens.
+* Do NOT change layouts.
+* Do NOT move existing UI elements.
+* Do NOT change branding or colors.
+* Do NOT alter business logic.
+* Do NOT modify existing user flows.
+* Existing functionality must continue working exactly as it does today.
+
+The goal is to improve the **experience layer only**.
+
+---
+
+# Cross-Platform Native Experience
+
+Deltan3D must feel like a premium native application on both iOS and Android.
+
+The experience should respect each platform's interaction conventions while maintaining one consistent Deltan3D identity.
+
+Do not force iOS behaviour onto Android or Android behaviour onto iOS where platform-specific behaviour is expected.
+
+Instead, create a unified motion system that feels natural on both platforms.
+
+---
+
+# Motion System
+
+Create a reusable application-wide motion system.
+
+Implement:
+
+* Natural spring physics
+* Proper damping
+* Momentum
+* Velocity-aware animations
+* Smooth easing curves
+* Interruptible animations
+* Responsive micro-interactions
+* Consistent animation timing
+* Fluid state transitions
+* High-performance GPU-accelerated animations wherever supported
+
+Animations should never feel artificial, slow or excessive.
+
+Every movement should feel intentional, smooth and premium.
+
+---
+
+# Typography
+
+Use the appropriate native system fonts.
+
+* iOS: SF Pro
+* Android: Roboto or the platform's current native system font
+* Web: high-quality fallbacks
+
+Maintain the existing typography hierarchy while improving spacing, weights and readability.
+
+---
+
+# Navigation
+
+Improve navigation transitions throughout the application.
+
+Examples include:
+
+* Screen push/pop
+* Screen presentation
+* Screen dismissal
+* Shared element transitions where appropriate
+* Interactive navigation gestures
+
+Navigation should feel fluid without changing the application's navigation structure.
+
+---
+
+# Buttons
+
+Upgrade every button interaction.
+
+Include:
+
+* Press feedback
+* Release feedback
+* Scale animations
+* Spring animations
+* Loading transitions
+* Disabled state transitions
+* Ripple effects where appropriate for Android
+* Native-feeling touch response for iOS
+
+Buttons should feel responsive and tactile.
+
+---
+
+# Cards
+
+Improve every card interaction.
+
+Include:
+
+* Hover effects on desktop/web
+* Press animations
+* Elevation transitions
+* Shadow interpolation
+* Smooth expansion
+* Consistent corner radius
+
+Do not redesign the cards.
+
+---
+
+# Scrolling
+
+Improve scrolling throughout the application.
+
+Implement:
+
+* Smooth momentum
+* Natural deceleration
+* Better inertia
+* Fluid nested scrolling
+* Smooth content appearance
+
+Scrolling should feel responsive on both Android and iOS.
+
+---
+
+# Bottom Sheets, Modals & Dialogs
+
+Upgrade all overlays.
+
+Include:
+
+* Native-feeling presentation
+* Interactive dismissal
+* Spring-based movement
+* Background dimming
+* Blur where appropriate
+* Smooth settling animations
+
+Do not change their purpose or placement.
+
+---
+
+# Gestures
+
+Improve gesture responsiveness.
+
+Support:
+
+* Swipe
+* Drag
+* Pinch
+* Long press
+* Double tap
+* Interactive dismiss gestures
+
+Gestures should feel responsive and predictable.
+
+---
+
+# Loading Experience
+
+Improve all loading states.
+
+Include:
+
+* Skeleton loaders
+* Animated placeholders
+* Progressive loading
+* Smooth fade-ins
+* Elegant transitions between loading and loaded content
+
+Avoid abrupt UI changes.
+
+---
+
+# Blur & Glass Effects
+
+Use blur and glass effects sparingly.
+
+Apply only where they enhance usability, such as:
+
+* Floating controls
+* Navigation overlays
+* Bottom sheets
+* Modal backgrounds
+
+Avoid unnecessary visual effects.
+
+---
+
+# Haptic Feedback
+
+Use native haptic feedback where supported.
+
+Provide subtle feedback for:
+
+* Button presses
+* Successful actions
+* Errors
+* Warnings
+* Selection changes
+* Drag interactions
+* Toggle changes
+
+Do not overuse haptics.
+
+---
+
+# Shadows, Corners & Spacing
+
+Standardize:
+
+* Corner radii
+* Elevation
+* Shadows
+* Internal spacing
+* External spacing
+* Margins
+* Padding
+
+Improve consistency without redesigning the interface.
+
+---
+
+# Existing Components
+
+Apply these improvements to every existing screen and component, including:
+
+* Authentication
+* Dashboard
+* Tour viewer
+* Tour editor
+* Property pages
+* Forms
+* Lists
+* Search
+* Menus
+* Navigation
+* Modals
+* Buttons
+* Cards
+
+Then ensure all future components automatically inherit the same motion and interaction system.
+
+---
+
+# Architecture
+
+Create reusable motion primitives, animation utilities, interaction hooks and shared UI behaviours.
+
+Avoid one-off animations.
+
+Every new feature should automatically use the same motion system.
+
+---
+
+# Performance
+
+Maintain excellent performance across all supported devices.
+
+Animations should remain smooth and responsive.
+
+Avoid unnecessary re-renders, layout thrashing and animation jank.
+
+---
+
+# Final Goal
+
+The finished application should **look like the same Deltan3D it is today**, but feel dramatically more polished.
+
+Users should notice smoother interactions, richer feedback, premium motion, better responsiveness and a more refined native experience across both iOS and Android, without feeling that the application has been redesigned.

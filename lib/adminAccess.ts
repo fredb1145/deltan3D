@@ -109,3 +109,11 @@ export function canAccessModule(access: AdminAccess, module: AdminModule) {
 
   return required[module].some(permission => access.permissions.has(permission));
 }
+
+export function hasAdminPermission(access: AdminAccess, permission: AdminPermission) {
+  if (!access.isAdmin) {
+    return false;
+  }
+
+  return access.permissions.has(permission);
+}

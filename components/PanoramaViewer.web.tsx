@@ -1,12 +1,14 @@
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { BackSide, SRGBColorSpace, TextureLoader } from 'three';
+import { BackSide, PerspectiveCamera, SRGBColorSpace, TextureLoader } from 'three';
 import { getPanoramaValidationMessage } from '../lib/panoramaValidation';
 
 type Props = {
   imageUrl: string;
   onError?: (message: string) => void;
+  onReady?: () => void;
+  showLoadingOverlay?: boolean;
 };
 
 type ControlState = {
@@ -14,6 +16,8 @@ type ControlState = {
   pitch: number;
   targetYaw: number;
   targetPitch: number;
+  fov: number;
+  targetFov: number;
 };
 
 class PanoramaErrorBoundary extends React.Component<
@@ -47,6 +51,10 @@ function clampPitch(value: number) {
   return Math.max(-limit, Math.min(limit, value));
 }
 
+function clampFov(value: number) {
+  return Math.max(40, Math.min(95, value));
+}
+
 function PanoramaScene({
   imageUrl,
   controls,
@@ -78,8 +86,9 @@ function PanoramaScene({
       return;
     }
 
-    camera.fov = 72;
-    camera.updateProjectionMatrix();
+    const panoramaCamera = camera as PerspectiveCamera;
+    panoramaCamera.fov = 72;
+    panoramaCamera.updateProjectionMatrix();
     onReady();
   }, [camera, onInvalid, onReady, texture]);
 
@@ -87,10 +96,14 @@ function PanoramaScene({
     const state = controls.current;
     state.yaw += (state.targetYaw - state.yaw) * 0.12;
     state.pitch += (state.targetPitch - state.pitch) * 0.12;
+    state.fov += (state.targetFov - state.fov) * 0.18;
 
     camera.rotation.order = 'YXZ';
     camera.rotation.y = state.yaw;
     camera.rotation.x = state.pitch;
+    const panoramaCamera = camera as PerspectiveCamera;
+    panoramaCamera.fov = state.fov;
+    panoramaCamera.updateProjectionMatrix();
   });
 
   return (
@@ -101,7 +114,12 @@ function PanoramaScene({
   );
 }
 
-export default function PanoramaViewer({ imageUrl, onError }: Props) {
+export default function PanoramaViewer({
+  imageUrl,
+  onError,
+  onReady,
+  showLoadingOverlay = true,
+}: Props) {
   const [ready, setReady] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -112,6 +130,8 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
     pitch: 0,
     targetYaw: 0,
     targetPitch: 0,
+    fov: 72,
+    targetFov: 72,
   });
 
   useEffect(() => {
@@ -121,12 +141,20 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
     controls.current.pitch = 0;
     controls.current.targetYaw = 0;
     controls.current.targetPitch = 0;
+    controls.current.fov = 72;
+    controls.current.targetFov = 72;
   }, [imageUrl]);
 
   const handleError = (message: string) => {
     setErrorMessage(message);
     onError?.(message);
   };
+
+  const wheelHandlers = {
+    onWheel: (event: any) => {
+      controls.current.targetFov = clampFov(controls.current.targetFov + event.deltaY * 0.03);
+    },
+  } as any;
 
   if (!imageUrl) {
     return (
@@ -159,11 +187,12 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
         lastPoint.current = { x: event.clientX, y: event.clientY };
 
         const sensitivity = 0.005;
-        controls.current.targetYaw -= dx * sensitivity;
-        controls.current.targetPitch = clampPitch(controls.current.targetPitch - dy * sensitivity);
+        controls.current.targetYaw += dx * sensitivity;
+        controls.current.targetPitch = clampPitch(controls.current.targetPitch + dy * sensitivity);
       }}
       onPointerUp={() => setDragging(false)}
       onPointerLeave={() => setDragging(false)}
+      {...wheelHandlers}
     >
       <PanoramaErrorBoundary onError={handleError}>
         <Canvas style={styles.canvas}>
@@ -171,14 +200,17 @@ export default function PanoramaViewer({ imageUrl, onError }: Props) {
             <PanoramaScene
               imageUrl={imageUrl}
               controls={controls}
-              onReady={() => setReady(true)}
+              onReady={() => {
+                setReady(true);
+                onReady?.();
+              }}
               onInvalid={handleError}
             />
           </Suspense>
         </Canvas>
       </PanoramaErrorBoundary>
 
-      {!ready ? (
+      {!ready && showLoadingOverlay ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator color="#C9A84C" />
         </View>
